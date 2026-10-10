@@ -1,0 +1,92 @@
+# ==============================================================================
+# GitHub Action: Automated Nightscout Telemetry Pruning
+# Repository: ballenstein/AndroidAPS (or dedicated maintenance repo)
+# Location: .github/workflows/nightscout-prune.yml
+# ==============================================================================
+#
+# PURPOSE:
+# AndroidAPS logs detailed algorithm telemetry, battery/pump status, and 4-hour
+# forward prediction arrays every 3-5 minutes when "Log detailed device status"
+# is checked in NSClient. This generates 500-900 MB/year per child.
+#
+# This script sends HTTP DELETE requests via the Nightscout REST API to purge
+# devicestatus records older than 30 days while keeping core clinical history
+# (entries for CGM curves, treatments for carbs & insulin boluses) permanently intact.
+#
+# SETUP INSTRUCTIONS:
+# 1. Add Repository Secrets in GitHub:
+#    Go to Settings -> Secrets and variables -> Actions -> New repository secret:
+#      - NIGHTSCOUT_URL_LILLIAN     : https://lillian-ns.nightscout.com
+#      - NIGHTSCOUT_URL_GRACE       : https://grace-ns.nightscout.com
+#      - NIGHTSCOUT_API_SECRET_HASH : The SHA-1 hash of your Nightscout API_SECRET.
+#
+#    * How to generate the SHA-1 hash of your API_SECRET:
+#      - Windows PowerShell:
+#        [BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes("YourSecret"))).Replace("-","").ToLower()
+#      - Linux / macOS bash:
+#        echo -n "YourSecret" | sha1sum | awk '{print $1}'
+#
+# 2. Testing & Manual Execution:
+#    Navigate to the "Actions" tab in GitHub -> select "Prune Nightscout Telemetry"
+#    -> click "Run workflow". Check the step logs for HTTP 200/204 responses.
+#
+# 3. Enabling Automated Schedule:
+#    Once Nightscout instances are live and secrets are confirmed, uncomment the
+#    'schedule' block below to run automatically every Sunday at 04:00 UTC.
+# ==============================================================================
+
+name: Prune Nightscout Telemetry
+
+on:
+  # SCHEDULE: Uncomment the block below once Nightscout accounts are active
+  # schedule:
+  #   - cron: '0 4 * * 0' # Runs automatically every Sunday at 04:00 UTC (11:00 PM CST Saturday)
+
+  # MANUAL TRIGGER: Allows on-demand runs from GitHub Actions UI tab
+  workflow_dispatch:
+
+jobs:
+  prune-devicestatus:
+    name: Prune Expired Devicestatus
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Purge Telemetry Older Than 30 Days
+        run: |
+          # Calculate ISO 8601 cutoff timestamp 30 days prior to current UTC execution
+          CUTOFF_DATE=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%S.000Z")
+          echo "Pruning devicestatus records older than: $CUTOFF_DATE"
+
+          SITES=(
+            "${{ secrets.NIGHTSCOUT_URL_LILLIAN }}"
+            "${{ secrets.NIGHTSCOUT_URL_GRACE }}"
+          )
+
+          for SITE in "${SITES[@]}"; do
+            if [ -n "$SITE" ]; then
+              echo "------------------------------------------------------"
+              echo "Processing Nightscout endpoint: $SITE"
+              
+              # Issue HTTP DELETE to devicestatus endpoint using MongoDB $lte filter
+              RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X DELETE \
+                -H "api-secret: ${{ secrets.NIGHTSCOUT_API_SECRET_HASH }}" \
+                -H "Content-Type: application/json" \
+                "$SITE/api/v1/devicestatus.json?find\[created_at\]\[\$lte\]=$CUTOFF_DATE")
+
+              HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | cut -d':' -f2)
+              BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS/d')
+
+              echo "HTTP Response Status: $HTTP_STATUS"
+              echo "Server Response: $BODY"
+
+              if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 204 ]; then
+                echo "Warning: Prune request for $SITE returned unexpected status $HTTP_STATUS"
+              else
+                echo "Successfully pruned old telemetry records for $SITE"
+              fi
+            else
+              echo "Notice: Endpoint secret not configured; skipping empty target."
+            fi
+          done
+          echo "------------------------------------------------------"
+          echo "Telemetry pruning run complete."
