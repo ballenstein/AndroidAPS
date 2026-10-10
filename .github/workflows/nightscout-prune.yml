@@ -51,9 +51,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Purge Telemetry Older Than 30 Days
+      - name: Purge Telemetry Older Than 60 Days
         run: |
-          # Calculate ISO 8601 cutoff timestamp 30 days prior to current UTC execution
+          # Calculate ISO 8601 cutoff timestamp 60 days prior to current UTC execution
           CUTOFF_DATE=$(date -u -d "60 days ago" +"%Y-%m-%dT%H:%M:%S.000Z")
           echo "Pruning devicestatus records older than: $CUTOFF_DATE"
 
