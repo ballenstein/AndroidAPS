@@ -10,7 +10,7 @@
 # is checked in NSClient. This generates 500-900 MB/year per child.
 #
 # This script sends HTTP DELETE requests via the Nightscout REST API to purge
-# devicestatus records older than 30 days while keeping core clinical history
+# devicestatus records older than 60 days while keeping core clinical history
 # (entries for CGM curves, treatments for carbs & insulin boluses) permanently intact.
 #
 # SETUP INSTRUCTIONS:
