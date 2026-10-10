@@ -16,8 +16,8 @@
 # SETUP INSTRUCTIONS:
 # 1. Add Repository Secrets in GitHub:
 #    Go to Settings -> Secrets and variables -> Actions -> New repository secret:
-#      - NIGHTSCOUT_URL_LILLIAN     : https://lillian-ns.nightscout.com
-#      - NIGHTSCOUT_URL_GRACE       : https://grace-ns.nightscout.com
+#      - NIGHTSCOUT_URL_SITE_1     : https://child1-ns.nightscout.com
+#      - NIGHTSCOUT_URL_Site_2     : https://child2-ns.nightscout.com
 #      - NIGHTSCOUT_API_SECRET_HASH : The SHA-1 hash of your Nightscout API_SECRET.
 #
 #    * How to generate the SHA-1 hash of your API_SECRET:
@@ -58,8 +58,8 @@ jobs:
           echo "Pruning devicestatus records older than: $CUTOFF_DATE"
 
           SITES=(
-            "${{ secrets.NIGHTSCOUT_URL_LILLIAN }}"
-            "${{ secrets.NIGHTSCOUT_URL_GRACE }}"
+            "${{ secrets.NIGHTSCOUT_URL_SITE_1 }}"
+            "${{ secrets.NIGHTSCOUT_URL_SITE_2 }}"
           )
 
           for SITE in "${SITES[@]}"; do
